@@ -15,16 +15,29 @@ type Decryptor interface {
 type decryptor struct {
 }
 
+func (d *decryptor) getPrivateInstance(blockBytes []byte) (*rsa.PrivateKey, error) {
+	private, err := x509.ParsePKCS1PrivateKey(blockBytes)
+	if err == nil {
+		return private, nil
+	}
+
+	privateInterface, err := x509.ParsePKCS8PrivateKey(blockBytes)
+	if err == nil {
+		return privateInterface.(*rsa.PrivateKey), nil
+	}
+	return nil, errors.New("private key error")
+}
+
 func (d *decryptor) Decrypt(privateKey []byte, encrypted []byte) (data []byte, err error) {
-	priBlock, _ := pem.Decode(privateKey)
-	if priBlock == nil {
+	block, _ := pem.Decode(privateKey)
+	if block == nil {
 		return nil, errors.New("privateKey key format error")
 	}
-	priv, err := x509.ParsePKCS1PrivateKey(priBlock.Bytes) //解析pem.Decode（）返回的Block指针实例
+	private, err := d.getPrivateInstance(block.Bytes)
 	if err != nil {
 		return nil, err
 	}
-	return rsa.DecryptPKCS1v15(rand.Reader, priv, encrypted)
+	return rsa.DecryptPKCS1v15(rand.Reader, private, encrypted)
 }
 
 func NewDecryptor() Decryptor {
